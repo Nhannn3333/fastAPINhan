@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,10 +18,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Dùng passlib để hash mật khẩu
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class UserCreate(BaseModel):
-    displayname: str
+    displayname: str  # Thêm trường displayname
     username: str
     password: str
 
@@ -31,9 +33,7 @@ class UserLogin(BaseModel):
 @app.post("/register")
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
     if get_user_by_username(db, user.username):
-        raise HTTPException(status_code=400, detail="Username already exists")
-    
-    # Hash mật khẩu nếu được gửi từ frontend dưới dạng plain text
+        return {"message": "Username already exists"}
     hashed_password = pwd_context.hash(user.password)
     new_user = create_user(db, displayname=user.displayname, username=user.username, hashed_password=hashed_password)
     return {"message": "User created successfully", "user_id": new_user.id}
@@ -41,12 +41,6 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
 @app.post("/login")
 def login_user(user: UserLogin, db: Session = Depends(get_db)):
     db_user = get_user_by_username(db, user.username)
-    if not db_user:
-        raise HTTPException(status_code=400, detail="Invalid username or password")
-    
-    # Kiểm tra mật khẩu đã được hash từ frontend (so sánh trực tiếp)
-    if user.password != db_user.hashed_password:
-        raise HTTPException(status_code=400, detail="Invalid username or password")
-    
+    if not db_user or not pwd_context.verify(user.password, db_user.hashed_password):
+        return {"message": "Invalid username or password"}
     return {"message": f"Welcome {db_user.displayname}!"}
-
