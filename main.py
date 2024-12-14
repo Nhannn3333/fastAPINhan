@@ -1,8 +1,14 @@
-from fastapi import FastAPI, HTTPException, Form
+# main.py
+from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy.orm import Session
+from database import get_db
+from crud import get_user_by_username, create_user
 from pydantic import BaseModel
+from passlib.context import CryptContext
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -12,21 +18,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Dùng passlib để hash mật khẩu
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Gắn cứng thông tin tài khoản
-VALID_USERNAME = "admin"
-VALID_PASSWORD = "12345"
-
-class LoginRequest(BaseModel):
+class UserCreate(BaseModel):
+    displayname: str  # Thêm trường displayname
     username: str
     password: str
 
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+@app.post("/register")
+def register_user(user: UserCreate, db: Session = Depends(get_db)):
+    if get_user_by_username(db, user.username):
+        raise HTTPException(status_code=400, detail="Username already exists")
+    hashed_password = pwd_context.hash(user.password)
+    new_user = create_user(db, displayname=user.displayname, username=user.username, hashed_password=hashed_password)
+    return {"message": "User created successfully", "user_id": new_user.id}
+
 @app.post("/login")
-def login(username: str = Form(...), password: str = Form(...)):
-    if username != VALID_USERNAME:
-        # raise HTTPException(status_code=401, detail="Sai tên đăng nhập")
-        return {"message": "Sai ten dang nhap"}
-    if password != VALID_PASSWORD:
-        # raise HTTPException(status_code=401, detail="Sai mật khẩu")
-        return {"message": "Sai mat khau"}
-    return {"message": "Dang nhap thanh cong"}
+def login_user(user: UserLogin, db: Session = Depends(get_db)):
+    db_user = get_user_by_username(db, user.username)
+    if not db_user or not pwd_context.verify(user.password, db_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Invalid username or password")
+    return {"message": f"Welcome {db_user.displayname}!"}
