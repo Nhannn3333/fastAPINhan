@@ -14,7 +14,9 @@ class LoginRequest(BaseModel):
 @app.post("/login")
 def login(username: str = Form(...), password: str = Form(...)):
     if username != VALID_USERNAME:
-        raise HTTPException(status_code=401, detail="Sai tên đăng nhập")
+        # raise HTTPException(status_code=401, detail="Sai tên đăng nhập")
+        return {"message": "Sai ten dang nhap"}
     if password != VALID_PASSWORD:
-        raise HTTPException(status_code=401, detail="Sai mật khẩu")
-    return {"message": "Bạn đã đăng nhập thành công"}
+        # raise HTTPException(status_code=401, detail="Sai mật khẩu")
+        return {"message": "Sai mat khau"}
+    return {"message": "Dang nhap thanh cong"}
